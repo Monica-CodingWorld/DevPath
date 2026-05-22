@@ -842,3 +842,52 @@ if (scrollTopBtn) {
     window.addEventListener('scroll', handleScroll);
     scrollTopBtn.addEventListener('click', scrollToTop);
 }
+
+// ============================================================
+// Theme Toggle
+// ============================================================
+
+(function initThemeToggle() {
+
+  var themeToggle = document.getElementById("theme-toggle");
+  var mobileThemeToggle = document.getElementById("mobile-theme-toggle");
+
+  var themeIcon = document.getElementById("theme-icon");
+  var mobileThemeIcon = document.getElementById("mobile-theme-icon");
+
+  var savedTheme = localStorage.getItem("theme");
+
+  // Load saved theme
+  if (savedTheme === "dark") {
+    document.body.classList.add("dark-theme");
+
+    if (themeIcon) themeIcon.textContent = "☀️";
+    if (mobileThemeIcon) mobileThemeIcon.textContent = "☀️";
+  }
+
+  function toggleTheme() {
+
+    document.body.classList.toggle("dark-theme");
+
+    var isDark = document.body.classList.contains("dark-theme");
+
+    localStorage.setItem("theme", isDark ? "dark" : "light");
+
+    if (themeIcon) {
+      themeIcon.textContent = isDark ? "☀️" : "🌙";
+    }
+
+    if (mobileThemeIcon) {
+      mobileThemeIcon.textContent = isDark ? "☀️" : "🌙";
+    }
+  }
+
+  if (themeToggle) {
+    themeToggle.addEventListener("click", toggleTheme);
+  }
+
+  if (mobileThemeToggle) {
+    mobileThemeToggle.addEventListener("click", toggleTheme);
+  }
+
+})();
