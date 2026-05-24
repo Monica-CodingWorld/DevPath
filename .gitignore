@@ -121,3 +121,6 @@ app.*.symbols
 venv/
 .venv/
 
+# Private issue analysis (local only)
+ISSUES.md
+
