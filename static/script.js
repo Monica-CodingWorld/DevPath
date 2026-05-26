@@ -532,7 +532,6 @@ if (clearFiltersBtn) {
           if (generalErr) {
             generalErr.textContent = "Something went wrong. Please try again.";
           }
-          console.error("API request failed:", err);
         });
         })
 
@@ -599,11 +598,7 @@ if (clearFiltersBtn) {
     //build a card for each project and add it to the grid
     projects.forEach(function (project) {
       console.log("inside loop", project);
-      try {
-        resultsGrid.appendChild(buildProjectCard(project));
-      } catch (err) {
-        console.error(err);
-      }
+      resultsGrid.appendChild(buildProjectCard(project));
     });
 
     resultsSection.scrollIntoView({ behavior: "smooth" });
