@@ -816,7 +816,7 @@ var progressBar = document.querySelector(
 
 // Local storage key
 var roadmapStorageKey =
-    "devpath-roadmap-progress";
+    `devpath-roadmap-progress-${PROJECT_ID}`;
 
 
 // ------------------------------------------------------------
