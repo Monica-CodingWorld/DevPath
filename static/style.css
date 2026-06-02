@@ -1688,6 +1688,8 @@ input[type="text"]:not(.skill-input-wrap input):focus {
 
 /* Tooltip icon */
 .tooltip {
+  position: relative;
+  top: 1px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1698,8 +1700,8 @@ input[type="text"]:not(.skill-input-wrap input):focus {
   background: var(--indigo-500);
   color: #ffffff;
   font-size: 11px;
-  cursor: help;
   font-weight: 700;
+  cursor: help;
 }
 
 /* Form hints and error messages */
@@ -3213,14 +3215,6 @@ html[data-theme="dark"] select:focus {
 
 html[data-theme="dark"] .skill-input-wrap input[type="text"] {
   color: var(--gray-700);
-.tooltip {
-  position: relative;
-  color: #6366f1;
-  top: 1px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: help;
 }
 
 .tooltip-text {
@@ -3252,7 +3246,8 @@ html[data-theme="dark"] .skill-input-wrap input[type="text"] {
 
 .tooltip:hover .tooltip-text,
 .tooltip:focus .tooltip-text,
-.tooltip:focus-visible .tooltip-text {
+.tooltip:focus-visible .tooltip-text,
+.tooltip:focus-within .tooltip-text {
   visibility: visible;
   opacity: 1;
 }
