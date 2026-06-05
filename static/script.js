@@ -187,6 +187,288 @@ var fetchBtn = document.getElementById('btn-fetch-github');
 var githubInput = document.getElementById('github-username');
 var errorMsg = document.getElementById('github-modal-error');
 
+var STORAGE_KEY = "devpathUserProgress";
+var progress = {
+  searches: 0,
+  projectViews: 0,
+  codeOpens: 0,
+  completions: 0,
+  points: 0,
+  viewedProjects: [],
+  completedProjects: [],
+  badges: {
+    first_search: false,
+    project_explorer: false,
+    code_starter: false,
+    completionist: false,
+    roadmap_runner: false
+  },
+  achievements: [],
+  bestScore: 0
+};
+
+var achievementToast = null;
+var achievementToastTimeout = null;
+
+function loadProgressState() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    var saved = JSON.parse(raw);
+    if (saved && typeof saved === "object") {
+      progress = Object.assign(progress, saved);
+      progress.viewedProjects = Array.isArray(saved.viewedProjects) ? saved.viewedProjects : [];
+      progress.completedProjects = Array.isArray(saved.completedProjects) ? saved.completedProjects : [];
+      progress.achievements = Array.isArray(saved.achievements) ? saved.achievements : [];
+      progress.badges = Object.assign(progress.badges, saved.badges || {});
+    }
+  } catch (err) {
+    console.warn("Unable to load progress state", err);
+  }
+}
+
+function saveProgressState() {
+  try {
+    progress.bestScore = Math.max(progress.bestScore, progress.points);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  } catch (err) {
+    console.warn("Unable to save progress state", err);
+  }
+}
+
+function resetProgressState() {
+  progress = {
+    searches: 0,
+    projectViews: 0,
+    codeOpens: 0,
+    completions: 0,
+    points: 0,
+    viewedProjects: [],
+    completedProjects: [],
+    badges: {
+      first_search: false,
+      project_explorer: false,
+      code_starter: false,
+      completionist: false,
+      roadmap_runner: false
+    },
+    achievements: [],
+    bestScore: 0
+  };
+  saveProgressState();
+  updateProfileWidgets();
+  showAchievementToast("Progress reset", "Your local profile has been cleared.");
+}
+
+function computeProgressPoints() {
+  progress.points = progress.searches * 5 + progress.projectViews * 10 + progress.codeOpens * 15 + progress.completions * 30;
+}
+
+function addAchievement(title, description) {
+  if (!title || !description) return;
+  var exists = progress.achievements.some(function (achievement) { return achievement.title === title; });
+  if (exists) return;
+
+  progress.achievements.unshift({
+    title: title,
+    description: description,
+    date: new Date().toLocaleDateString()
+  });
+
+  if (progress.achievements.length > 5) {
+    progress.achievements.pop();
+  }
+}
+
+function showAchievementToast(title, detail) {
+  if (!achievementToast) {
+    achievementToast = document.getElementById("achievement-toast");
+  }
+  if (!achievementToast) return;
+
+  achievementToast.innerHTML = "<strong>" + title + "</strong>" +
+    "<span>" + detail + "</span>";
+  achievementToast.classList.add("show");
+
+  clearTimeout(achievementToastTimeout);
+  achievementToastTimeout = setTimeout(function () {
+    achievementToast.classList.remove("show");
+  }, 3200);
+}
+
+function updateProfileWidgets() {
+  var pointsEl = document.getElementById("progress-points");
+  var statsEl = document.getElementById("progress-stats");
+  var meterFill = document.getElementById("progress-meter-fill");
+  var badgesEl = document.getElementById("progress-badges");
+  var achievementList = document.getElementById("achievement-list");
+  var leaderboardList = document.getElementById("leaderboard-list");
+  var historyList = document.getElementById("completed-history-list");
+  var completionBtn = document.getElementById("btn-mark-complete");
+
+  if (pointsEl) pointsEl.textContent = progress.points;
+  if (statsEl) {
+    statsEl.innerHTML =
+      "<li><strong>Searches</strong><span>" + progress.searches + "</span></li>" +
+      "<li><strong>Projects Viewed</strong><span>" + progress.projectViews + "</span></li>" +
+      "<li><strong>Code Opens</strong><span>" + progress.codeOpens + "</span></li>" +
+      "<li><strong>Projects Completed</strong><span>" + progress.completions + "</span></li>";
+  }
+  if (meterFill) {
+    var percentage = Math.min(100, Math.round((progress.points / 250) * 100));
+    meterFill.style.width = percentage + "%";
+    meterFill.setAttribute("aria-valuenow", percentage);
+    meterFill.textContent = percentage + "%";
+  }
+
+  if (badgesEl) {
+    var badgeDefs = [
+      {id: "first_search", label: "First Search", detail: "Run your first project search."},
+      {id: "project_explorer", label: "Project Explorer", detail: "View a project detail page."},
+      {id: "code_starter", label: "Code Starter", detail: "Open starter code."},
+      {id: "completionist", label: "Completionist", detail: "Mark a project complete."},
+      {id: "roadmap_runner", label: "Roadmap Runner", detail: "Search five times."}
+    ];
+    badgesEl.innerHTML = badgeDefs.map(function (badge) {
+      var isUnlocked = progress.badges[badge.id];
+      return "<li class=\"progress-badge " + (isUnlocked ? "progress-badge--unlocked" : "progress-badge--locked") + " title=\"" + badge.detail + "\">" +
+        "<span class=\"badge-icon\">" + (isUnlocked ? "✓" : "☆") + "</span>" +
+        "<span>" + badge.label + "</span>" +
+        "</li>";
+    }).join("");
+  }
+
+  if (achievementList) {
+    if (progress.achievements.length === 0) {
+      achievementList.innerHTML = "<li class=\"achievement-empty\">No achievements yet. Use DevPath and unlock the first badge.</li>";
+    } else {
+      achievementList.innerHTML = progress.achievements.map(function (achievement) {
+        return "<li class=\"achievement-item\"><strong>" + achievement.title + "</strong>" +
+          "<span>" + achievement.description + "</span>" +
+          "<small>" + achievement.date + "</small></li>";
+      }).join("");
+    }
+  }
+
+  if (leaderboardList) {
+    var ranked = getLeaderboardEntries();
+    leaderboardList.innerHTML = ranked.map(function (entry, index) {
+      return "<li><span>" + (index + 1) + ". " + entry.name + "</span>" +
+        "<strong>" + entry.points + " pts</strong></li>";
+    }).join("");
+  }
+
+  if (historyList) {
+    if (progress.completedProjects.length === 0) {
+      historyList.innerHTML = "<li class=\"achievement-empty\">No completed projects yet. Mark one complete from a project page.</li>";
+    } else {
+      historyList.innerHTML = progress.completedProjects.slice(0, 5).map(function (item) {
+        var title = item && typeof item === "object" ? item.title : "Project " + item;
+        return "<li><span>" + title + "</span><strong>Completed</strong></li>";
+      }).join("");
+    }
+  }
+
+  if (completionBtn) {
+    var completed = projectIsCompleted(PROJECT_ID);
+    completionBtn.textContent = completed ? "Project Completed" : "Mark Project Complete";
+    completionBtn.disabled = completed;
+  }
+}
+
+function projectIsCompleted(projectId) {
+  if (!projectId) return false;
+  return progress.completedProjects.some(function (item) {
+    var id = item && typeof item === "object" ? item.id : item;
+    return id === projectId;
+  });
+}
+
+function getLeaderboardEntries() {
+  var entries = [
+    { name: "Ava", points: 245 },
+    { name: "Kai", points: 192 },
+    { name: "Sam", points: 176 },
+    { name: "You", points: progress.points }
+  ];
+  return entries.sort(function (a, b) { return b.points - a.points; }).slice(0, 5);
+}
+
+function tryUnlockBadges() {
+  if (progress.searches >= 1) {
+    unlockBadge("first_search", "First Search", "You used DevPath to find your first project.");
+  }
+  if (progress.projectViews >= 1) {
+    unlockBadge("project_explorer", "Project Explorer", "You viewed a project detail.");
+  }
+  if (progress.codeOpens >= 1) {
+    unlockBadge("code_starter", "Code Starter", "You opened starter code.");
+  }
+  if (progress.completions >= 1) {
+    unlockBadge("completionist", "Completionist", "You marked a project complete.");
+  }
+  if (progress.searches >= 5) {
+    unlockBadge("roadmap_runner", "Roadmap Runner", "You searched five times.");
+  }
+}
+
+function unlockBadge(id, title, detail) {
+  if (progress.badges[id]) return;
+  progress.badges[id] = true;
+  addAchievement(title, detail);
+  showAchievementToast("Badge unlocked", title + " — " + detail);
+  saveProgressState();
+  updateProfileWidgets();
+}
+
+function recordSearch() {
+  progress.searches += 1;
+  computeProgressPoints();
+  tryUnlockBadges();
+  saveProgressState();
+  updateProfileWidgets();
+}
+
+function recordProjectView() {
+  if (typeof PROJECT_ID === "undefined") return;
+  if (progress.viewedProjects.indexOf(PROJECT_ID) !== -1) return;
+  progress.viewedProjects.push(PROJECT_ID);
+  progress.projectViews = progress.viewedProjects.length;
+  computeProgressPoints();
+  tryUnlockBadges();
+  saveProgressState();
+  updateProfileWidgets();
+}
+
+function recordCodeOpen() {
+  progress.codeOpens += 1;
+  computeProgressPoints();
+  tryUnlockBadges();
+  saveProgressState();
+  updateProfileWidgets();
+}
+
+function recordCompletion(projectId, projectTitle) {
+  if (!projectId) return;
+  if (projectIsCompleted(projectId)) {
+    showAchievementToast("Already completed", "You've already marked this project complete.");
+    return;
+  }
+  progress.completedProjects.push({
+    id: projectId,
+    title: projectTitle || "Project " + projectId
+  });
+  progress.completions = progress.completedProjects.length;
+  computeProgressPoints();
+  addAchievement("Completionist", "You finished a project and earned completion points.");
+  tryUnlockBadges();
+  saveProgressState();
+  updateProfileWidgets();
+}
+
+loadProgressState();
+updateProfileWidgets();
+
 
 // ============================================================
 // Mobile navigation toggle (runs on all pages)
@@ -284,6 +566,11 @@ if (isIndexPage) {
       }
     });
   }
+
+var resetProgressBtn = document.getElementById("reset-progress-btn");
+if (resetProgressBtn) {
+  resetProgressBtn.addEventListener("click", resetProgressState);
+}
 
 
   // ----------------------------------------------------------
@@ -710,10 +997,10 @@ if (isIndexPage) {
         .catch(function () {
           setLoadingState(false);
           var generalErr = document.getElementById("form-error-general");
-
           if (generalErr) {
             generalErr.textContent = "An unexpected error occurred. Please try again.";
           }
+          console.error("API request failed:", err);
         });
     });
   }); 
@@ -764,6 +1051,7 @@ if (isIndexPage) {
     resultsLoadingEl.style.display = "none";
     // Clear out any cards from a previous search before showing new ones
     resultsGrid.innerHTML = "";
+    recordSearch();
 
     if (!projects || projects.length === 0) {
       resultsGrid.style.display = "none";
@@ -791,6 +1079,7 @@ if (isIndexPage) {
       resultsGrid.appendChild(buildProjectCard(project));
     });
 
+    recordSearch();
     resultsSection.scrollIntoView({ behavior: "smooth" });
     return;
   }
