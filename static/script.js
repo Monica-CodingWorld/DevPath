@@ -705,55 +705,18 @@ if (isIndexPage) {
 
   setLoadingState(true);
 
-  requestAnimationFrame(function () {
-
-    var payload = {
-      skills: skillsHidden.value.trim() || skillsTextInput.value.trim(),
-      level: document.getElementById("level").value,
-      interest: document.getElementById("interest").value,
-      time: document.getElementById("time").value
-    };
-
-    fetch("/api/recommend", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    })
-      .then(function (res) {
-        return res.json();
-      })
-      .then(function (data) {
-
-        setLoadingState(false);
-
-        if (data.error) {
+          renderResults(data.projects || [], data.message);
+        })
+        .catch(function () {
+          setLoadingState(false);
           var generalErr = document.getElementById("form-error-general");
+
           if (generalErr) {
-            generalErr.textContent = data.error;
+            generalErr.textContent = "An unexpected error occurred. Please try again.";
           }
-
-          return;
-        }
-
-        renderResults(data.projects || [], data.message);
-      })
-      .catch(function (err) {
-
-        setLoadingState(false);
-
-        var generalErr = document.getElementById("form-error-general");
-
-        if (generalErr) {
-          generalErr.textContent =
-            "Something went wrong. Please try again.";
-        }
-
-        console.error("API request failed:", err);
-      });
-  });
-});
+        });
+    });
+  }); 
 
   // Manages the loading state of the form and results section(whats visible or not)
   function setLoadingState(isLoading) {
