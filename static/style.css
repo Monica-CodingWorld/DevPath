@@ -1534,3 +1534,8 @@ select:focus {
   .container { padding: 0 20px; }
   .section-sub { margin-bottom: 40px; }
 }
+/* Fix: dropdown z-index above skill tags */
+.skills-suggestions {
+  position: absolute;
+  z-index: 50;
+}
