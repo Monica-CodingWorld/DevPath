@@ -18,7 +18,7 @@ import pytest
 # Allow imports from the project root when running tests directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from utils.data_loader import load_all_projects, find_project_by_id, clear_cache
+from utils.data_loader import load_all_projects, find_project_by_id, clear_cache, validate_projects
 from utils.recommender import (
     get_recommendations,
     validate_recommendation_inputs,
@@ -50,6 +50,107 @@ def test_projects_json_loads():
     assert isinstance(projects, list), "Expected a list of projects"
     assert len(projects) > 0, "Project list must not be empty"
 
+def test_duplicate_ids_detected():
+    projects = [
+        {
+            "id": 1,
+            "title": "Project A",
+            "skills": [],
+            "level": "Beginner",
+            "interest": "AI",
+            "time": "1 week",
+            "description": "desc",
+            "features": [],
+            "tech_stack": [],
+            "roadmap": [],
+            "resources": [],
+            "starter_code": "code"
+        },
+        {
+            "id": 1,
+            "title": "Project B",
+            "skills": [],
+            "level": "Beginner",
+            "interest": "AI",
+            "time": "1 week",
+            "description": "desc",
+            "features": [],
+            "tech_stack": [],
+            "roadmap": [],
+            "resources": [],
+            "starter_code": "code"
+        }
+    ]
+
+    with pytest.raises(ValueError):
+        validate_projects(projects)
+
+def test_duplicate_titles_detected():
+    projects = [
+        {
+            "id": 1,
+            "title": "AI Resume Builder",
+            "skills": [],
+            "level": "Beginner",
+            "interest": "AI",
+            "time": "1 week",
+            "description": "desc",
+            "features": [],
+            "tech_stack": [],
+            "roadmap": [],
+            "resources": [],
+            "starter_code": "code"
+        },
+        {
+            "id": 2,
+            "title": "ai resume builder",
+            "skills": [],
+            "level": "Beginner",
+            "interest": "AI",
+            "time": "1 week",
+            "description": "desc",
+            "features": [],
+            "tech_stack": [],
+            "roadmap": [],
+            "resources": [],
+            "starter_code": "code"
+        }
+    ]
+
+    with pytest.raises(ValueError):
+        validate_projects(projects)
+
+def test_empty_title_detected():
+    projects = [
+        {
+            "id": 1,
+            "title": "",
+            "skills": [],
+            "level": "Beginner",
+            "interest": "AI",
+            "time": "1 week",
+            "description": "desc",
+            "features": [],
+            "tech_stack": [],
+            "roadmap": [],
+            "resources": [],
+            "starter_code": "code"
+        }
+    ]
+
+    with pytest.raises(ValueError):
+        validate_projects(projects)
+
+def test_missing_required_field_detected():
+    projects = [
+        {
+            "id": 1,
+            "title": "Project A"
+        }
+    ]
+
+    with pytest.raises(ValueError):
+        validate_projects(projects)
 
 def test_each_project_has_required_fields():
     """Every project must have the fields the UI depends on."""
@@ -93,6 +194,32 @@ def test_parse_skills_empty_string():
 def test_parse_skills_single_entry():
     """parse_skills should handle a single skill with no commas."""
     assert parse_skills("JavaScript") == ["javascript"]
+
+
+def test_parse_skills_valid_json_array():
+    """parse_skills should parse a valid JSON array of skills."""
+    result = parse_skills('["Python","React"]')
+    assert result == ["python", "react"]
+
+
+def test_parse_skills_malformed_json_handling():
+    """parse_skills should handle malformed JSON gracefully using fallback."""
+    # Should not crash, and parses via fallback comma-splitting behavior
+    result = parse_skills('["Python",]')
+    assert isinstance(result, list)
+    assert len(result) > 0
+
+
+def test_parse_skills_legacy_fallback():
+    """parse_skills should parse a legacy comma-separated string."""
+    result = parse_skills("Python,React")
+    assert result == ["python", "react"]
+
+
+def test_parse_skills_containing_commas():
+    """parse_skills should preserve skill names containing commas when using JSON."""
+    result = parse_skills('["HTML, CSS","JavaScript"]')
+    assert result == ["html, css", "javascript"]
 
 
 def test_score_single_project_full_match():
@@ -242,6 +369,20 @@ def test_get_recommendations_result_format():
         assert "title" in project
 
 
+def test_case_insensitive_recommendations_identical():
+    """Lowercase and titlecase skill inputs must produce identical recommendations."""
+    results_lower = get_recommendations("python", "Beginner", "Data", "Low")
+    results_title = get_recommendations("Python", "Beginner", "Data", "Low")
+    assert [p["id"] for p in results_lower] == [p["id"] for p in results_title]
+
+
+def test_whitespace_stripped_in_skills():
+    """Leading/trailing whitespace in the skills string must be ignored."""
+    results_clean = get_recommendations("python", "Beginner", "Data", "Low")
+    results_spaced = get_recommendations("   python  ", "Beginner", "Data", "Low")
+    assert [p["id"] for p in results_clean] == [p["id"] for p in results_spaced]
+
+
 # ============================================================
 # Input validation tests
 # ============================================================
@@ -354,6 +495,34 @@ def test_recommend_api_missing_field():
     assert "error" in response.get_json()
 
 
+def test_recommend_api_null_field():
+    """The API should return 400 when a field is explicitly set to null."""
+    client = get_client()
+    response = client.post("/api/recommend", json={
+        "skills": None,
+        "level": "Beginner",
+        "interest": "Web",
+        "time": "Low"
+    })
+    assert response.status_code == 400
+    data = response.get_json()
+    assert "error" in data
+
+
+def test_recommend_api_non_string_field():
+    """The API should return 400 when a field is a non-string type (e.g. a list)."""
+    client = get_client()
+    response = client.post("/api/recommend", json={
+        "skills": ["Python", "HTML"],
+        "level": "Beginner",
+        "interest": "Web",
+        "time": "Low"
+    })
+    assert response.status_code == 400
+    data = response.get_json()
+    assert "error" in data
+
+
 def test_recommend_api_empty_body():
     """The API should return 400 when the body is not valid JSON."""
     client = get_client()
@@ -399,6 +568,39 @@ def test_download_code_found():
     client = get_client()
     response = client.get("/project/1/download")
     assert response.status_code == 200
+
+
+def test_view_code_nested_path():
+    """A project with a nested starter_code path should still return 200."""
+    client = get_client()
+    project = next(
+        p for p in load_all_projects()
+        if "/" in p["starter_code"].replace("starter_code/", "")
+    )
+    response = client.get(f"/project/{project['id']}/code")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert "code" in data
+    assert "filename" in data
+    assert len(data["code"]) > 0
+
+
+def test_download_code_nested_path():
+    """A project with a nested starter_code path should still download."""
+    client = get_client()
+    project = next(
+        p for p in load_all_projects()
+        if "/" in p["starter_code"].replace("starter_code/", "")
+    )
+    response = client.get(f"/project/{project['id']}/download")
+    assert response.status_code == 200
+
+
+def test_resolve_starter_file_path_traversal():
+    """resolve_starter_file must return None for path traversal attempts."""
+    from utils.file_server import resolve_starter_file
+    malicious = {"starter_code": "starter_code/../../routes/main_routes.py"}
+    assert resolve_starter_file(malicious) is None
     
 def test_health_check():
     client = get_client()
@@ -417,7 +619,31 @@ def test_scoring_weights_has_all_keys():
     expected_keys = {"skill", "level", "interest", "time"}
     assert set(SCORING_WEIGHTS.keys()) == expected_keys
 
+def test_search_api_returns_results():
+    """Search API should return matching projects for a valid query."""
+    client = get_client()
+    response = client.get("/api/search?q=python")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert isinstance(data, list)
 
+def test_search_api_empty_query():
+    """Search API should return an empty list for blank queries."""
+    client = get_client()
+    response = client.get("/api/search?q=")
+    assert response.status_code == 200
+    data = response.get_json()
+    assert data == []
+
+def test_search_api_no_match():
+    """Search should return empty list for nonsense query."""
+    client = get_client()
+    response = client.get("/api/search?q=nonexistentqueryxyz")
+    assert response.status_code == 200
+
+    data = response.get_json()
+    assert isinstance(data, list)
+    assert len(data) == 0
 # ============================================================
 # Sitemap and robots.txt tests
 # ============================================================

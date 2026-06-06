@@ -1,104 +1,36 @@
-// script.js — DevPath client-side logic
-//
-// Responsibilities:
-//   - Theme initialisation (dark / light) with localStorage persistence
-//   - Mobile navigation toggle
-//   - Skill chip manager (add/remove skills)
-//   - Form validation with per-field error messages
-//   - Recommendation API call and loading states
-//   - Result card rendering
-//   - Code viewer panel (detail page)
-
-
-// ============================================================
-// THEME ENGINE
-// ============================================================
-// The theme system works in three parts:
-//
-//  Part A — Anti-FOUC inline script (in <head> of each template):
-//    Sets html[data-theme] synchronously before the stylesheet is
-//    evaluated, so the browser paints the correct colours on frame 1.
-//
-//  Part B — initTheme() (runs immediately below):
-//    Syncs the toggle button aria-pressed + aria-label with the
-//    already-applied theme. Adds the "theme-ready" class on the
-//    next animation frame so CSS transitions become active only
-//    AFTER the initial paint (preventing a colour transition flash
-//    when the page first loads).
-//
-//  Part C — applyTheme(theme) (called on button click):
-//    The single source of truth for all theme changes. Updates
-//    data-theme, localStorage, aria-pressed, aria-label, and an
-//    aria-live region so screen readers announce the change.
-// ============================================================
+// DevPath client-side behavior.
 
 (function () {
+  var html = document.documentElement;
 
-  // ---- Part B: sync button state once DOM is ready ----------
-  function initTheme() {
-    var html  = document.documentElement;
-    var theme = html.dataset.theme || "light";
+  function applyTheme(theme) {
+    var isDark = theme === "dark";
+    html.setAttribute("data-theme", theme);
+    try {
+      localStorage.setItem("theme", theme);
+    } catch (err) {
+      // Storage can be unavailable in private browsing.
+    }
 
-    // Sync every toggle button on the page (desktop + mobile versions)
-    document.querySelectorAll(".theme-toggle").forEach(function (btn) {
-      var isDark = theme === "dark";
-      // aria-pressed = true when dark mode is ON
-      btn.setAttribute("aria-pressed", isDark ? "true" : "false");
-      // aria-label describes what clicking WILL do (not what IS active),
-      // which is the recommended accessible pattern for toggle buttons.
-      btn.setAttribute("aria-label",
-        isDark ? "Switch to light mode" : "Switch to dark mode"
-      );
+    document.querySelectorAll(".theme-toggle").forEach(function (button) {
+      button.setAttribute("aria-pressed", isDark ? "true" : "false");
+      button.setAttribute("aria-label", isDark ? "Switch to light mode" : "Switch to dark mode");
     });
+  }
 
-    // Add .theme-ready on the NEXT frame so CSS transitions are
-    // suppressed during the initial render (avoids colour flash).
+  function initTheme() {
+    var theme = html.getAttribute("data-theme") || "light";
+    applyTheme(theme);
     requestAnimationFrame(function () {
       html.classList.add("theme-ready");
     });
   }
 
-  // ---- Part C: apply a theme change -------------------------
-  function applyTheme(theme) {
-    var html   = document.documentElement;
-    var isDark = theme === "dark";
-
-    // 1. Apply via data attribute — CSS [data-theme="dark"] picks this up
-    html.dataset.theme = theme;
-
-    // 2. Persist the user's choice across sessions
-    try { localStorage.setItem("devpath-theme", theme); } catch (e) { /* private browsing may block */ }
-
-    // 3. Update every toggle button's accessible state
-    document.querySelectorAll(".theme-toggle").forEach(function (btn) {
-      btn.setAttribute("aria-pressed", isDark ? "true" : "false");
-      btn.setAttribute("aria-label",
-        isDark ? "Switch to light mode" : "Switch to dark mode"
-      );
-    });
-
-    // 4. Announce the change to screen readers via a visually-hidden
-    //    aria-live="polite" region injected once into the DOM.
-    var liveRegion = document.getElementById("theme-announce");
-    if (!liveRegion) {
-      liveRegion = document.createElement("span");
-      liveRegion.id = "theme-announce";
-      // Visually hidden but readable by screen readers
-      liveRegion.setAttribute("role", "status");
-      liveRegion.setAttribute("aria-live", "polite");
-      liveRegion.style.cssText =
-        "position:absolute;width:1px;height:1px;padding:0;overflow:hidden;" +
-        "clip:rect(0,0,0,0);white-space:nowrap;border:0;";
-      document.body.appendChild(liveRegion);
-    }
-    liveRegion.textContent = isDark ? "Dark mode enabled." : "Light mode enabled.";
-  }
-
-
-  document.addEventListener("click", function (evt) {
-    var btn = evt.target.closest(".theme-toggle");
-    if (!btn) return;
-    var current = document.documentElement.dataset.theme || "light";
+  document.addEventListener("click", function (event) {
+    var toggle = event.target.closest(".theme-toggle");
+    if (!toggle) return;
+    event.preventDefault();
+    var current = html.getAttribute("data-theme") || "light";
     applyTheme(current === "dark" ? "light" : "dark");
   });
 
@@ -151,7 +83,6 @@ var errorMsg = document.getElementById("github-modal-error");
       toggle.setAttribute("aria-expanded", "false");
     });
   });
-})();
 
 // ============================================================
 // INDEX PAGE
@@ -204,6 +135,7 @@ if (isIndexPage) {
 
     clearFieldError("skills-error");
   }
+}
 
   // ============================================================
   // Clear Filters
@@ -238,6 +170,7 @@ if (isIndexPage) {
       }
     }, 0);
   });
+}
 
   // ============================================================
   // Skills
@@ -269,6 +202,7 @@ if (isIndexPage) {
       "MongoDB"
     ];
   }
+}
 
   var suggestionsDiv = document.getElementById("skills-suggestions");
 
@@ -287,6 +221,7 @@ if (isIndexPage) {
       return normalizeSkill(selectedSkill) === normalizedSkill;
     });
   }
+}
 
   function getCanonicalSkill(rawSkill) {
 
@@ -607,7 +542,6 @@ if (isIndexPage) {
 
       valid = false;
     }
-
     return valid;
   }
 
@@ -787,41 +721,28 @@ if (isIndexPage) {
 
     title.textContent = project.title;
 
-    // Description wrapper — keeps text and button as separate child elements
-    // so we never use textContent (which would wipe out child nodes like the button)
     var desc = document.createElement("p");
 
     desc.className = "project-card-desc";
-
-    // Separate span for the description text so we can update it
-    // without touching the toggle button
     var descText = document.createElement("span");
     descText.className = "project-card-desc-text";
-
-    var shortText = truncate(project.description, 120);
-    var fullText  = project.description;
-    var isExpanded = false;
-
-    descText.textContent = shortText;
+    descText.textContent = truncate(project.description, 120);
     desc.appendChild(descText);
 
-    // Only add Read More button if description is actually truncated
-    if (fullText.length > 120) {
-      var readMoreBtn = document.createElement("button");
-      readMoreBtn.className = "read-more-btn";
-      readMoreBtn.textContent = "Read more";
-      // aria-expanded tells screen readers whether the content is expanded or not
-      readMoreBtn.setAttribute("aria-expanded", "false");
-
-      readMoreBtn.addEventListener("click", function () {
-        isExpanded = !isExpanded;
-        // Update only the text span — button stays in the DOM untouched
-        descText.textContent = isExpanded ? fullText : shortText;
-        readMoreBtn.textContent = isExpanded ? "Read less" : "Read more";
-        readMoreBtn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+    if (project.description && project.description.length > 120) {
+      var expanded = false;
+      var readMore = document.createElement("button");
+      readMore.type = "button";
+      readMore.className = "read-more-btn";
+      readMore.textContent = "Read more";
+      readMore.setAttribute("aria-expanded", "false");
+      readMore.addEventListener("click", function () {
+        expanded = !expanded;
+        descText.textContent = expanded ? project.description : truncate(project.description, 120);
+        readMore.textContent = expanded ? "Read less" : "Read more";
+        readMore.setAttribute("aria-expanded", expanded ? "true" : "false");
       });
-
-      desc.appendChild(readMoreBtn);
+      desc.appendChild(readMore);
     }
 
     var tagsRow = document.createElement("div");
@@ -840,21 +761,18 @@ if (isIndexPage) {
     var footer = document.createElement("div");
 
     footer.className = "project-card-footer";
-
     var link = document.createElement("a");
 
     link.className = "btn-details";
 
     link.textContent = "View Full Project";
     link.href = "/project/" + project.id;
-
     footer.appendChild(link);
 
     card.appendChild(title);
     card.appendChild(desc);
-    card.appendChild(tagsRow);
+    card.appendChild(tags);
     card.appendChild(footer);
-
     return card;
   }
 
@@ -883,8 +801,13 @@ if (isIndexPage) {
 
 /* ---- Scroll-to-top button ---- */
 
-/* Show the button only when the user has scrolled more than 300px */
-var SCROLL_THRESHOLD = 300;
+  if (completionBtn) {
+    completionBtn.addEventListener("click", function () {
+      recordCompletion(PROJECT_ID, typeof PROJECT_TITLE !== "undefined" ? PROJECT_TITLE : "");
+      showAchievementToast("Project completed", "Nice work finishing this project.");
+    });
+  }
+})();
 
 var scrollTopBtn = document.getElementById("scroll-top-btn");
 
@@ -911,3 +834,10 @@ if (scrollTopBtn) {
     window.addEventListener('scroll', handleScroll);
     scrollTopBtn.addEventListener('click', scrollToTop);
   }
+
+  window.addEventListener("scroll", update, { passive: true });
+  button.addEventListener("click", function () {
+    window.scrollTo({ top: atBottom ? 0 : document.body.scrollHeight, behavior: "smooth" });
+  });
+  update();
+})();
