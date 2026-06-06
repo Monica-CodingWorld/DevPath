@@ -376,6 +376,7 @@ function updateProfileWidgets() {
   }
 }
 
+
 function projectIsCompleted(projectId) {
   if (!projectId) return false;
   return progress.completedProjects.some(function (item) {
@@ -999,9 +1000,7 @@ if (resetProgressBtn) {
           }
           console.error("API request failed:", err);
         });
-    });
-  }); 
-
+  
   // Manages the loading state of the form and results section(whats visible or not)
   function setLoadingState(isLoading) {
     // Disable the button so the user can't accidentally submit twice
@@ -1039,46 +1038,6 @@ if (resetProgressBtn) {
     span.className = "project-tag project-tag--" + type;
     span.textContent = text;
     return span;
-  }
-
-  //takes the array of projects from the api and draws them on the page as cards
-  //if array is empty it shows the "no results" message instead
-  function renderResults(projects, message) {
-    resultsSection.style.display = "block";
-    resultsLoadingEl.style.display = "none";
-    // Clear out any cards from a previous search before showing new ones
-    resultsGrid.innerHTML = "";
-    recordSearch();
-
-    if (!projects || projects.length === 0) {
-      resultsGrid.style.display = "none";
-      resultsEmptyEl.style.display = "block";
-
-      // Show a friendly custom message when the user selected an interest
-      var selectedInterest = document.getElementById("interest")?.value;
-      if (selectedInterest) {
-        emptyMessageEl.textContent = "No projects are currently available for this interest. Please check back later or try a different area.";
-      } else if (message) {
-        emptyMessageEl.textContent = message;
-      } else {
-        emptyMessageEl.textContent = "Try adjusting your skills or choosing a different interest area.";
-      }
-
-  // Clear out previous results before rendering new ones
-  resultsGrid.innerHTML = "";
-
-  // If no projects are returned, show the empty state message
-  if (!projects || projects.length === 0) {
-    resultsGrid.style.display = "none";
-    resultsEmptyEl.style.display = "block";
-
-    projects.forEach(function (project) {
-      resultsGrid.appendChild(buildProjectCard(project));
-    });
-
-    recordSearch();
-    resultsSection.scrollIntoView({ behavior: "smooth" });
-    return;
   }
 
   function buildProjectCard(project) {
@@ -1173,7 +1132,7 @@ if (resetProgressBtn) {
   // ============================================================
   if (isDetailPage) {
 
-    var codePanel = document.getElementById("code-panel"); // sliding panel that shows the starter code "
+    var codePanel = document.getElementById("code-panel"); // sliding panel that shows the starter code 
     var codePanelOverlay = document.getElementById("code-panel-overlay"); // background overlay 
     var codeContentEl = document.getElementById("code-content"); // <pre> element inside the panel where the code will be inserted
     var codePanelFilename = document.getElementById("code-panel-filename"); // filename display
@@ -1259,7 +1218,7 @@ if (resetProgressBtn) {
           }
         });
     }
-
+  
    // ============================================================
 // ROADMAP PROGRESS TRACKER
 // ============================================================
