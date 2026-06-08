@@ -17,11 +17,6 @@ SCORING_WEIGHTS = {
     "time":     1,
 }
 
-WEIGHT_SKILL = SCORING_WEIGHTS["skill"]
-WEIGHT_LEVEL = SCORING_WEIGHTS["level"]
-WEIGHT_INTEREST = SCORING_WEIGHTS["interest"]
-WEIGHT_TIME = SCORING_WEIGHTS["time"]
-
 
 VALID_LEVELS = {"beginner", "intermediate", "advanced"}
 VALID_INTERESTS = {
@@ -120,8 +115,8 @@ def score_single_project(
     coverage_ratio = matched_skills / total_project_skills if total_project_skills > 0 else 0.0
 
     # Add weighted points based on the number of matching skills.
-    # Skill coverage boosts score when more project skills are matched.
-    score += matched_skills * SCORING_WEIGHTS["skill"] * coverage_ratio
+    # More overlapping skills result in a higher recommendation score.
+    score += matched_skills * SCORING_WEIGHTS["skill"]
 
     # Award points for each additional matching criterion
     if project.get("level", "").lower() == level.lower():
@@ -132,6 +127,8 @@ def score_single_project(
 
     if project.get("time", "").lower() == time_availability.lower():
         score += SCORING_WEIGHTS["time"]
+
+    return score
 
     if project.get("time", "").lower() in valid_time :
         return score
